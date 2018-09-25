@@ -9,9 +9,14 @@
 import UIKit
 import os.log
 
-class MealTableViewController: UITableViewController {
+class MealTableViewController: UITableViewController, UISearchResultsUpdating {
+
 
     var meals =  [Meal]()
+    var searchData = [Meal]()
+    var searchControl: UISearchController?
+    
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -25,9 +30,35 @@ class MealTableViewController: UITableViewController {
             // Load the sample data.
             loadSampLeMeals()
         }
+        // Search in foodtracker
+        searchData = meals
+        searchControl = UISearchController(searchResultsController: nil)
+//        tableView.tableHeaderView = searchControl?.searchBar
+        searchControl?.searchResultsUpdater = self
+//        tableView.dataSource = self
+        searchControl?.dimsBackgroundDuringPresentation = false
+        
+        navigationItem.searchController = searchControl
+        definesPresentationContext = true
+        
+        
 
     }
+    
+    func updateSearchResults(for searchController: UISearchController) {
+        if let searchText = searchControl?.searchBar.text, !searchText.isEmpty {
+            searchData = meals.filter { (item: Meal) -> Bool in
+                return (item.name.range(of: searchText, options: .caseInsensitive, range: nil, locale: nil) != nil)
+            }
 
+        } else { searchData = meals }
+        
+        tableView.reloadData()
+    }
+
+    
+    
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
@@ -42,7 +73,7 @@ class MealTableViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         // #warning Incomplete implementation, return the number of rows
-        return meals.count
+        return searchData.count
     }
 
  
@@ -57,7 +88,7 @@ class MealTableViewController: UITableViewController {
         }
         
         // Fetches the appropriate meal for the data source layout.
-        let meal = meals[indexPath.row]
+        let meal = searchData[indexPath.row]
         
         cell.nameLabel.text = meal.name
         cell.photoImageView.image = meal.photo
@@ -89,8 +120,9 @@ class MealTableViewController: UITableViewController {
                 fatalError("The selected cell is not being displayed by the table")
             }
             
-            let selectedMeal = meals[indexPath.row]
+            let selectedMeal = searchData[indexPath.row]
             mealDetailViewController.meal = selectedMeal
+            
             
         default:
             fatalError("Unexpected Segue Identifier; \(segue.identifier)")
@@ -122,13 +154,18 @@ class MealTableViewController: UITableViewController {
         if let sourceViewController = sender.source as? MealViewController, let meal = sourceViewController.meal {
             
             if let selectedIndexPath = tableView.indexPathForSelectedRow {
-                meals[selectedIndexPath.row] = meal
+                if let index = meals.index(of: searchData[selectedIndexPath.row]) {
+                    meals[index] = meal
+                    searchData[selectedIndexPath.row] = meal
+                }
+//                searchData[selectedIndexPath.row] = meal
                 tableView.reloadRows(at: [selectedIndexPath], with: .none)
             }
             else {
             // Add a new meal.
-            let newIndexPath = IndexPath(row: meals.count, section: 0)
-            meals.append(meal)
+            let newIndexPath = IndexPath(row: searchData.count, section: 0)
+            searchData.append(meal)
+            meals = searchData
             tableView.insertRows(at: [newIndexPath], with: .automatic)
             }
             // Save the meals.
@@ -138,8 +175,11 @@ class MealTableViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCellEditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            
-            meals.remove(at: indexPath.row)
+            if let index = meals.index(of: searchData[indexPath.row]) {
+                meals.remove(at: index)
+                searchData.remove(at: indexPath.row)
+            }
+//            meals.remove(at: indexPath.row)
             saveMeals()
             tableView.deleteRows(at: [indexPath], with: .fade)
         }
